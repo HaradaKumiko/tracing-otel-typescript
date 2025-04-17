@@ -1,53 +1,110 @@
 #!/bin/bash
 
-# Base URL of your API
-API_URL="http://localhost:3000/products"
+# Colors
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-# Array of sample product names
+BASE_URL="http://localhost:3000"
+LOOP_COUNT=1000  # change to 100 or 1000 if you want
+
+# Sample product data
 NAMES=("Laptop" "Smartphone" "Tablet" "Headphones" "Keyboard" "Mouse" "Monitor" "Camera" "Speaker" "Router")
+DESCRIPTIONS=(
+  "High quality product with advanced features"
+  "Latest model with improved performance"
+  "Premium build quality and durability"
+  "Energy efficient and eco-friendly"
+  "User-friendly interface and design"
+)
 
-# Function to generate random price between 100 and 10000
-generate_random_price() {
-    echo $((RANDOM % 9900 + 100))
+generate_name() {
+  echo "${NAMES[$RANDOM % ${#NAMES[@]}]} $1"
 }
 
-# Function to generate random description
-generate_random_description() {
-    DESCRIPTIONS=(
-        "High quality product with advanced features"
-        "Latest model with improved performance"
-        "Premium build quality and durability"
-        "Energy efficient and eco-friendly"
-        "User-friendly interface and design"
-    )
-    echo "${DESCRIPTIONS[$RANDOM % ${#DESCRIPTIONS[@]}]}"
+generate_price() {
+  echo $((RANDOM % 9900 + 100))
 }
 
-# Loop 1000 times
-for i in {1..1000}; do
-    # Generate random data
-    NAME="${NAMES[$RANDOM % ${#NAMES[@]}]} $i"
-    PRICE=$(generate_random_price)
-    DESCRIPTION=$(generate_random_description)
+generate_description() {
+  echo "${DESCRIPTIONS[$RANDOM % ${#DESCRIPTIONS[@]}]}"
+}
 
-    # Create JSON payload
-    PAYLOAD=$(cat <<EOF
+make_request() {
+  local method=$1
+  local endpoint=$2
+  local data=$3
+
+  if [ -n "$data" ]; then
+    curl -s -X "$method" "${BASE_URL}${endpoint}" \
+      -H "Content-Type: application/json" \
+      -d "$data"
+  else
+    curl -s -X "$method" "${BASE_URL}${endpoint}" \
+      -H "Content-Type: application/json"
+  fi
+}
+
+# Main loop
+for i in $(seq 1 $LOOP_COUNT); do
+  echo -e "\n${BLUE}--- Product #$i ---${NC}"
+
+  name=$(generate_name $i)
+  price=$(generate_price)
+  description=$(generate_description)
+
+  create_payload=$(cat <<EOF
 {
-    "name": "$NAME",
-    "price": $PRICE,
-    "description": "$DESCRIPTION"
+  "name": "$name",
+  "price": $price,
+  "description": "$description"
 }
 EOF
-    )
+)
 
-    # Send POST request
-    echo "Inserting product $i: $NAME"
-    curl -X POST "$API_URL" \
-         -H "Content-Type: application/json" \
-         -d "$PAYLOAD"
+  # CREATE
+  echo -e "${BLUE}[CREATE]${NC}"
+  create_response=$(make_request "POST" "/products" "$create_payload")
+  echo "$create_response" | jq .
+  product_id=$(echo "$create_response" | jq -r '.id')
 
-    # Add a small delay to prevent overwhelming the server
-    sleep 0.1
+  if [[ -z "$product_id" || "$product_id" == "null" ]]; then
+    echo -e "${RED}❌ Failed to create product $i${NC}"
+    continue
+  fi
+
+  # READ
+  echo -e "${BLUE}[READ]${NC}"
+  make_request "GET" "/products/$product_id" | jq .
+
+  # UPDATE
+  new_price=$(generate_price)
+  new_description="Updated: $(generate_description)"
+  update_payload=$(cat <<EOF
+{
+  "price": $new_price,
+  "description": "$new_description"
+}
+EOF
+)
+
+  echo -e "${BLUE}[UPDATE]${NC}"
+  make_request "PUT" "/products/$product_id" "$update_payload" | jq .
+
+  # READ AGAIN
+  echo -e "${BLUE}[READ AFTER UPDATE]${NC}"
+  make_request "GET" "/products/$product_id" | jq .
+
+  # DELETE
+  echo -e "${BLUE}[DELETE]${NC}"
+  make_request "DELETE" "/products/$product_id" | jq .
+
+  # VERIFY DELETE
+  echo -e "${BLUE}[VERIFY DELETE]${NC}"
+  make_request "GET" "/products/$product_id" | jq .
+
+  echo -e "${GREEN}✅ Completed CRUD for product ID: $product_id${NC}"
 done
 
-echo "Finished inserting 1000 products" 
+echo -e "\n${GREEN}🎉 Finished full CRUD loop for $LOOP_COUNT products.${NC}"
