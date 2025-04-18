@@ -4,15 +4,11 @@ datasources:
   - name: Prometheus
     type: prometheus
     access: proxy
-    url: http://prometheus:9090
+    url: http://app-prometheus:9090
     isDefault: true
 
-  # - name: Tempo
-  #   type: tempo
-  #   access: proxy
-  #   url: http://tempo:3200
-  #   uid: tempo
-  #   jsonData:
-  #     httpMethod: GET
-  #     serviceMap:
-  #       datasourceUid: prometheus 
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://app-loki:3100
+    uid: loki

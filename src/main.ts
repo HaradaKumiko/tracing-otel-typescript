@@ -13,7 +13,7 @@ async function bootstrap() {
   // Use the tracing interceptor globally
   app.useGlobalInterceptors(new TracingInterceptor());
   
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 6000);
 
   // Graceful shutdown
   process.on('SIGTERM', () => {

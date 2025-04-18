@@ -20,7 +20,7 @@ RUN npx prisma generate
 RUN npm run build
 
 # Expose the port the app runs on
-EXPOSE 3000
+EXPOSE 6000
 
 # Create startup script
 RUN echo '#!/bin/sh' > /app/start.sh && \

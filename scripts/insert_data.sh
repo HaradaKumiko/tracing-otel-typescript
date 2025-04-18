@@ -6,7 +6,7 @@ RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-BASE_URL="http://localhost:3000"
+BASE_URL="http://localhost:6000"
 LOOP_COUNT=1000  # change to 100 or 1000 if you want
 
 # Sample product data

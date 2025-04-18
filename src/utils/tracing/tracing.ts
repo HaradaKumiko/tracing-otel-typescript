@@ -7,11 +7,11 @@ import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions'
 export function SetupTracing() {
   const sdk = new NodeSDK({
     resource: new Resource({
-      [SemanticResourceAttributes.SERVICE_NAME]: 'product-service',
+      [SemanticResourceAttributes.SERVICE_NAME]: 'backend-tracing-service',
       [SemanticResourceAttributes.SERVICE_VERSION]: '1.0.0',
     }),
     traceExporter: new OTLPTraceExporter({
-      url: 'http://jaeger:4318/v1/traces',
+      url: 'http://app-jaeger:4318/v1/traces',
     }),
     instrumentations: [getNodeAutoInstrumentations()],
   });

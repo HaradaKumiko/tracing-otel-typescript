@@ -1,20 +1,28 @@
 version: '3.8'
-
 services:
-  app:
+  app-backend:
+    container_name: app-backend
     build:
       context: ..
       dockerfile: deploy/Dockerfile
     ports:
-      - "3000:3000"
+      - "6000:6000"
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres?schema=public
+      - DATABASE_URL=postgresql://postgres:postgres@app-postgres:5432/postgres?schema=public
       - NODE_ENV=development
     depends_on:
-      postgres:
+      app-postgres:
         condition: service_healthy
+    logging:
+      driver: fluentd
+      options:
+        tag: app-backend
+        fluentd-sub-second-precision: 'true'
+    networks:
+      - research-monitoring
 
-  postgres:
+  app-postgres:
+    container_name: app-postgres
     image: postgres:15-alpine
     environment:
       - POSTGRES_USER=postgres
@@ -29,9 +37,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - research-monitoring
 
-  # Commenting out Jaeger since we're using Tempo first
-  jaeger:
+  app-jaeger:
+    container_name: app-jaeger
     image: jaegertracing/all-in-one:latest
     ports:
       - "16686:16686"  # Jaeger UI
@@ -39,8 +49,11 @@ services:
       - "4317:4317"    # OTLP gRPC
     environment:
       - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - research-monitoring
 
-  prometheus:
+  app-prometheus:
+    container_name: app-prometheus
     image: prom/prometheus:latest
     ports:
       - "9090:9090"
@@ -53,9 +66,12 @@ services:
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
     depends_on:
-      - node-exporter
+      - app-node-exporter
+    networks:
+      - research-monitoring
 
-  node-exporter:
+  app-node-exporter:
+    container_name: app-node-exporter
     image: prom/node-exporter:latest
     ports:
       - "9100:9100"
@@ -68,11 +84,14 @@ services:
       - '--path.rootfs=/rootfs'
       - '--path.sysfs=/host/sys'
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - research-monitoring
 
-  grafana:
+  app-grafana:
+    container_name: app-grafana
     image: grafana/grafana:latest
     ports:
-      - "3001:3000"
+      - "3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning/:/etc/grafana/provisioning/
@@ -83,22 +102,39 @@ services:
       - GF_AUTH_DISABLE_LOGIN_FORM=true
       - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
     depends_on:
-      - prometheus
-      - jaeger
+      - app-prometheus
+      - app-jaeger
+    networks:
+      - research-monitoring
 
-  # tempo:
-  #   image: grafana/tempo:latest
-  #   command: ["-config.file=/etc/tempo.yaml"]
-  #   volumes:
-  #     - ./tempo/tempo.yaml:/etc/tempo.yaml
-  #     - tempo_data:/var/lib/tempo
-  #   ports:
-  #     - "3200:3200"   # tempo
-  #     - "4317:4317"   # otlp grpc
-  #     - "4318:4318"   # otlp http
-  #   user: "root"
+  app-loki:
+    container_name: app-loki
+    image: grafana/loki:latest
+    ports: 
+      - "3100:3100"
+    volumes: 
+      - ./loki:/etc/loki
+    command: -config.file=/etc/loki/config.yaml
+    networks:
+      - research-monitoring
+
+  app-fluentbit: 
+    container_name: app-fluentbit
+    image: fluent/fluent-bit:latest
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    volumes:
+      - ./fluentbit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
+      - ../logs:/example/logs
+    networks:
+      - research-monitoring
 
 volumes:
   postgres_data:
   prometheus_data:
   grafana_data:
+
+networks:
+  research-monitoring:
+    driver: bridge
